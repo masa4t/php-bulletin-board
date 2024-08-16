@@ -1,3 +1,38 @@
+<?php 
+    require('library.php');
+    session_start();
+
+    if (isset($_SESSION['id']) && isset($_SESSION['name'])) {
+        $name = $_SESSION['name'];
+        $id = $_SESSION['id'];
+    } else {
+        header('Location: login.php');
+        exit();
+    }
+
+    $db = dbconnect();
+
+    if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+        $message = filter_input(INPUT_POST, 'message', FILTER_SANITIZE_FULL_SPECIAL_CHARS);
+        
+        $stmt = $db->prepare('insert into posts (message, member_id) values(?,?)');
+        if (!$stmt) {
+            die($db->error);
+        }
+
+        $stmt->bind_param('si', $message, $id);
+        $success = $stmt->execute();
+
+        if (!$success) {
+            die($db->error);
+        }
+
+        header('Location: index.php');
+        exit();
+    }
+
+?>
+
 <!DOCTYPE html>
 <html lang="ja">
 
@@ -19,7 +54,7 @@
         <div style="text-align: right"><a href="logout.php">ログアウト</a></div>
         <form action="" method="post">
             <dl>
-                <dt>○○さん、メッセージをどうぞ</dt>
+                <dt><?php echo h($name)?>さん、メッセージをどうぞ</dt>
                 <dd>
                     <textarea name="message" cols="50" rows="5"></textarea>
                 </dd>
@@ -31,13 +66,35 @@
             </div>
         </form>
 
+        <?php $stmt = $db->prepare('select p.id, p.member_id, p.message, p.created, m.name, m.picture from posts p, members m where m.id=p.member_id order by p.id desc');
+        
+        if (!$stmt) {
+            die($db->error);
+        }
+        $success = $stmt->execute();
+
+        if (!$success) {
+            die($db->error);
+        }
+
+        $stmt->bind_result($id, $member_id, $message, $created, $name, $picture);
+        
+        while ($stmt->fetch()):
+
+        ?>
         <div class="msg">
-            <img src="member_picture/" width="48" height="48" alt=""/>
-            <p>○○<span class="name">（○○）</span></p>
-            <p class="day"><a href="view.php?id=">2021/01/01 00:00:00</a>
-                [<a href="delete.php?id=" style="color: #F33;">削除</a>]
+            
+            <?php if($picture): ?>
+                <img src="member_picture/<?php echo h($picture); ?>" width="48" height="48" alt=""/>
+            <?php endif; ?>
+            <p><?php echo h($message); ?><span class="name"><p><?php echo h($name); ?></span></p>
+            <p class="day"><a href="view.php?id=<?php echo h($id); ?>"><p><?php echo h($created); ?></a>
+            <?php if ($_SESSION['id'] === $member_id): ?>
+                [<a href="delete.php?id=<?php echo h($id); ?>" style="color: #F33;">削除</a>]
+            <?php endif; ?>
             </p>
         </div>
+        <?php endwhile; ?>
     </div>
 </div>
 </body>
